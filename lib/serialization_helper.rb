@@ -114,8 +114,8 @@ module SerializationHelper
     def self.convert_arrays(records, columns)
       records.each do |record|
         columns.each do |column|
-          next unless is_array(record[column])
-          record[column] = convert_array(record[column])
+          next unless is_array(record[column[0]])
+          record[column[0]] = convert_array(record[column[0]], column[1])
         end
       end
       records
@@ -123,11 +123,15 @@ module SerializationHelper
 
     def self.array_columns(table)
       columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { !c.try(:array) } }
-      columns.map { |c| c.name }
+      columns.map { |c| [ c.name, c.sql_type.to_sym ] }
     end
 
-    def self.convert_array(value)
-      value[1..-2].split(',')
+    def self.convert_array(value, type)
+      if type == :integer
+        value[1..-2].split(',').map { |v| v.to_i}
+      else
+        value[1..-2].split(',')
+      end
     end
 
     def self.is_array(value)
