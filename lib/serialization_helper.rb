@@ -111,6 +111,29 @@ module SerializationHelper
       records
     end
 
+    def self.convert_arrays(records, columns)
+      records.each do |record|
+        columns.each do |column|
+          next unless is_array(record[column])
+          record[column] = convert_array(record[column])
+        end
+      end
+      records
+    end
+
+    def self.array_columns(table)
+      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { c.type != :array } }
+      columns.map { |c| c.name }
+    end
+
+    def self.convert_array(value)
+      value[1..-2].split(',')
+    end
+
+    def self.is_array(value)
+      value.kind_of?(String) and ((value =~ /^\{.*\}$/) == 0)
+    end
+
     def self.convert_booleans(records, columns)
       records.each do |record|
         columns.each do |column|
@@ -178,12 +201,14 @@ module SerializationHelper
       pages = (total_count.to_f / records_per_page).ceil - 1
       id = table_column_names(table).first
       boolean_columns = SerializationHelper::Utils.boolean_columns(table)
+      array_columns = SerializationHelper::Utils.array_columns(table)
       quoted_table_name = SerializationHelper::Utils.quote_table(table)
 
       (0..pages).to_a.each do |page|
         query = Arel::Table.new(table).order(id).skip(records_per_page*page).take(records_per_page).project(Arel.sql('*'))
         records = ActiveRecord::Base.connection.select_all(query)
         records = SerializationHelper::Utils.convert_booleans(records, boolean_columns)
+        records = SerializationHelper::Utils.convert_arrays(records, array_columns)
         yield records
       end
     end
