@@ -122,7 +122,7 @@ module SerializationHelper
     end
 
     def self.array_columns(table)
-      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { c.type != :array } }
+      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { !c.try(:array) } }
       columns.map { |c| c.name }
     end
 

@@ -6,7 +6,7 @@ describe YamlDb::Dump do
     silence_warnings { ActiveRecord::Base = mock('ActiveRecord::Base', :null_object => true) }
     ActiveRecord::Base.stub(:connection).and_return(stub('connection').as_null_object)
     ActiveRecord::Base.connection.stub!(:tables).and_return([ 'mytable', 'schema_info', 'schema_migrations' ])
-    ActiveRecord::Base.connection.stub!(:columns).with('mytable').and_return([ mock('a',:name => 'a', :type => :string), mock('b', :name => 'b', :type => :array) ])
+    ActiveRecord::Base.connection.stub!(:columns).with('mytable').and_return([ mock('a',:name => 'a', :type => :string, :array =>false), mock('b', :name => 'b', :type => :string, :array => true) ])
     ActiveRecord::Base.connection.stub!(:select_one).and_return({"count"=>"2"})
     ActiveRecord::Base.connection.stub!(:select_all).and_return([ { 'a' => 1, 'b' => '{}' }, { 'a' => 3, 'b' => '{aa,bb,cc}' } ])
     YamlDb::Utils.stub!(:quote_table).with('mytable').and_return('mytable')
@@ -46,7 +46,7 @@ EOYAML
     YamlDb::Dump.dump_table_records(@io, 'mytable')
     @io.rewind
     @io.read.should == <<EOYAML
-  records:
+  records: 
   - - 1
     - []
   - - 3
