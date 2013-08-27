@@ -8,7 +8,7 @@ Any database that has an ActiveRecord adapter should work.  This gem is now Rail
 
 [![Build Status](https://secure.travis-ci.org/ludicast/yaml_db.png)](http://travis-ci.org/ludicast/yaml_db)
 
-Note: This fork aims at getting it works with Rails 4 and the postgresql augmented capacity of having array and hash fields. The branch is named rails4.
+Note: This fork aims at getting it works with Rails 4 and the postgresql augmented capacity of having array and hash fields. The branch is named rails4 and is now merge into master.
 
 ## Installation
 
