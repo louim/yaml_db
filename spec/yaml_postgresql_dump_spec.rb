@@ -6,9 +6,18 @@ describe YamlDb::Dump do
     silence_warnings { ActiveRecord::Base = mock('ActiveRecord::Base', :null_object => true) }
     ActiveRecord::Base.stub(:connection).and_return(stub('connection').as_null_object)
     ActiveRecord::Base.connection.stub!(:tables).and_return([ 'mytable', 'schema_info', 'schema_migrations' ])
-    ActiveRecord::Base.connection.stub!(:columns).with('mytable').and_return([ mock('a',:name => 'a', :type => :string, :sql_type => 'string', :array => false), mock('b', :name => 'b', :type => :integer, :sql_type => 'integer', :array => true), mock('c', :name => 'c', :type => :string, :sql_type => 'string', :array => true) ])
+    ActiveRecord::Base.connection.stub!(:columns).with('mytable').and_return([
+      mock('a', :name => 'a', :type => :string,  :array => false),
+      mock('b', :name => 'b', :type => :integer, :array => true ),
+      mock('c', :name => 'c', :type => :string,  :array => true ),
+      mock('c', :name => 'd', :type => :boolean, :array => true ),
+      mock('c', :name => 'e', :type => :hstore,  :array => false)
+    ])
     ActiveRecord::Base.connection.stub!(:select_one).and_return({"count"=>"2"})
-    ActiveRecord::Base.connection.stub!(:select_all).and_return([ { 'a' => 1, 'b' => '{}', 'c' => '{}' }, { 'a' => 3, 'b' => '{1,2,3}', 'c' => '{aa,bb,cc}' } ])
+    ActiveRecord::Base.connection.stub!(:select_all).and_return([
+      { 'a' => 1, 'b' => '{}',      'c' => '{}',         'd' => '{false,true,true,false}', 'e' => '' },
+      { 'a' => 3, 'b' => '{1,2,3}', 'c' => '{aa,bb,cc}', 'd' => '{false}',                 'e' => '"aa"=>"1", "bb"=>"2", "cc"=>"3"' }
+    ])
     YamlDb::Utils.stub!(:quote_table).with('mytable').and_return('mytable')
   end
 
@@ -50,6 +59,11 @@ EOYAML
   - - 1
     - []
     - []
+    - - false
+      - true
+      - true
+      - false
+    - {}
   - - 3
     - - 1
       - 2
@@ -57,6 +71,10 @@ EOYAML
     - - aa
       - bb
       - cc
+    - - false
+    - aa: '1'
+      bb: '2'
+      cc: '3'
 EOYAML
   end
 end
