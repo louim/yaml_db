@@ -111,6 +111,35 @@ module SerializationHelper
       records
     end
 
+    def self.convert_arrays(records, columns)
+      records.each do |record|
+        columns.each do |column|
+          next unless is_array(record[column[0]])
+          record[column[0]] = convert_array(record[column[0]], column[1])
+        end
+      end
+      records
+    end
+
+    def self.array_columns(table)
+      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { !c.try(:array) } }
+      columns.map { |c| [ c.name, c.type ] }
+    end
+
+    def self.convert_array(value, type)
+      if type == :integer
+        value[1..-2].split(',').map { |v| v.to_i}
+      elsif type == :boolean
+        value[1..-2].split(',').map { |v| ['t', '1', 'true', true, 1].include?(v) }
+      else
+        value[1..-2].split(',')
+      end
+    end
+
+    def self.is_array(value)
+      value.kind_of?(String) and ((value =~ /^\{.*\}$/) == 0)
+    end
+
     def self.convert_booleans(records, columns)
       records.each do |record|
         columns.each do |column|
@@ -122,16 +151,48 @@ module SerializationHelper
     end
 
     def self.convert_boolean(value)
-      ['t', '1', true, 1].include?(value)
+      ['t', '1', 'true', true, 1].include?(value)
     end
 
     def self.boolean_columns(table)
-      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { c.type != :boolean } }
+      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { (c.type != :boolean) or c.try(:array) } }
       columns.map { |c| c.name }
     end
 
     def self.is_boolean(value)
       value.kind_of?(TrueClass) or value.kind_of?(FalseClass)
+    end
+
+    def self.convert_hstores(records, columns)
+      records.each do |record|
+        columns.each do |column|
+          record[column] = convert_hstore(record[column])
+        end
+      end
+      records
+    end
+
+    def self.convert_hstore(value)
+      unless value.blank?
+        # This converts a string like '"aa"=>"bb", "cc"=>"dd","ee"=>"ff"' to a hash.
+        # The algorithm is as following:
+        #
+        # 1) Get rid of left and right spaces (strip)
+        # 2) replace '=>' with ',' (first gsub)
+        # 3) replace ', ' with ',' (second gsub)
+        # 4) get rid of the first and the last '"' ([1..-2])
+        # 5) extract each individual arguments in an array (split)
+        # 6) transmit the array as a list of parameters to the Hash class (Hash[*...])
+        #
+        Hash[*value.strip.gsub('=>', ',').gsub('", "', '","')[1..-2].split('","')]
+      else
+        {}
+      end
+    end
+
+    def self.hstore_columns(table)
+      columns = ActiveRecord::Base.connection.columns(table).reject { |c| silence_warnings { c.type != :hstore } }
+      columns.map { |c| c.name }
     end
 
     def self.quote_table(table)
@@ -178,12 +239,16 @@ module SerializationHelper
       pages = (total_count.to_f / records_per_page).ceil - 1
       id = table_column_names(table).first
       boolean_columns = SerializationHelper::Utils.boolean_columns(table)
+      array_columns = SerializationHelper::Utils.array_columns(table)
+      hstore_columns = SerializationHelper::Utils.hstore_columns(table)
       quoted_table_name = SerializationHelper::Utils.quote_table(table)
 
       (0..pages).to_a.each do |page|
         query = Arel::Table.new(table).order(id).skip(records_per_page*page).take(records_per_page).project(Arel.sql('*'))
         records = ActiveRecord::Base.connection.select_all(query)
         records = SerializationHelper::Utils.convert_booleans(records, boolean_columns)
+        records = SerializationHelper::Utils.convert_arrays(records, array_columns)
+        records = SerializationHelper::Utils.convert_hstores(records, hstore_columns)
         yield records
       end
     end
